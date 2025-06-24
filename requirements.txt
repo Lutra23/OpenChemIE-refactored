@@ -1,0 +1,32 @@
+# OpenChemIE 统一项目依赖
+
+# --- 核心 AI & 图像处理 ---
+torch>=1.8.0
+torchvision>=0.9.0
+opencv-python>=4.5.0
+Pillow>=8.0.0
+numpy>=1.20.0
+
+# --- PDF & 数据处理 ---
+pymupdf>=1.18.0
+pandas>=1.3.0
+# json5 and pdftotext might be implicitly required by other libs, add if needed
+
+# --- 后端 Web 服务 ---
+fastapi>=0.100.0
+uvicorn[standard]>=0.20.0
+
+# --- 原 OpenChemIE 依赖 ---
+# OpenChemIE 主包现在是 app.core 的一部分，不再需要通过git安装。
+# 旧依赖中的 jupyter 和 matplotlib 作为可选的开发工具，暂时不加入核心依赖。
+
+# 可选：Jupyter支持
+jupyter>=1.0.0
+matplotlib>=3.3.0
+
+# 可选：GPU支持（根据需要选择其中一个）
+# torch[gpu]  # 对于较新的PyTorch版本
+# torch-gpu   # 对于较老的版本
+
+# 注意：OpenChemIE主包需要单独安装：
+# pip install 'OpenChemIE @ git+https://github.com/CrystalEye42/OpenChemIE' 
