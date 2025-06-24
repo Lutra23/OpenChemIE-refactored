@@ -10,16 +10,25 @@
       @drop.prevent="onDrop"
       @click="triggerFileInput"
     >
-      <input type="file" @change="onFileChange" ref="fileInput" style="display: none" />
-      <p v-if="!selectedFile">拖拽文件到此处，或点击选择文件</p>
-      <p v-else>{{ selectedFile.name }}</p>
+      <input type="file" @change="onFileChange" ref="fileInput" style="display: none" multiple />
+      <div v-if="selectedFiles.length === 0">
+        <p>拖拽文件到此处，或点击选择文件</p>
+        <p class="small-text">(可选择多个文件)</p>
+      </div>
+      <div v-else>
+        <p>{{ selectedFiles.length }} 个文件已选择:</p>
+        <ul>
+          <li v-for="file in selectedFiles" :key="file.name">{{ file.name }}</li>
+        </ul>
+      </div>
     </div>
-    <button @click="handleUpload" :disabled="!selectedFile || isUploading" class="upload-button">
+    <button @click="handleUpload" :disabled="selectedFiles.length === 0 || isUploading" class="upload-button">
       {{ isUploading ? '上传中...' : '上传' }}
     </button>
     <div v-if="uploadStatus" class="status-message">
       <p>{{ uploadStatus }}</p>
-      <p v-if="taskId">任务 ID: {{ taskId }}</p>
+      <p v-if="batchId">批处理 ID: {{ batchId }}</p>
+      <p v-if="batchProgress">{{ batchProgress }}</p>
       <p v-if="errorDetails" class="error-details">{{ errorDetails }}</p>
     </div>
     <div v-if="results" class="results-container">
@@ -34,10 +43,11 @@ import { ref, onUnmounted } from 'vue';
 import axios from 'axios';
 
 const fileInput = ref(null);
-const selectedFile = ref(null);
+const selectedFiles = ref([]);
 const isUploading = ref(false);
 const uploadStatus = ref('');
-const taskId = ref(null);
+const batchId = ref(null);
+const batchProgress = ref('');
 const isDragging = ref(false);
 const results = ref(null);
 const pollingInterval = ref(null);
@@ -66,9 +76,10 @@ const onDrop = (event) => {
 
 const handleFile = (files) => {
   if (files.length > 0) {
-    selectedFile.value = files[0];
+    selectedFiles.value = Array.from(files);
     uploadStatus.value = '';
-    taskId.value = null;
+    batchId.value = null;
+    batchProgress.value = '';
     results.value = null;
     errorDetails.value = '';
     if (pollingInterval.value) {
@@ -79,7 +90,7 @@ const handleFile = (files) => {
 
 const fetchResults = async (id) => {
   try {
-    const response = await axios.get(`http://localhost:8000/api/results/${id}`);
+    const response = await axios.get(`http://localhost:8000/api/results/batch/${id}`);
     results.value = response.data;
   } catch (error) {
     console.error('获取结果出错:', error);
@@ -90,17 +101,17 @@ const fetchResults = async (id) => {
 const pollStatus = (id) => {
   pollingInterval.value = setInterval(async () => {
     try {
-      const response = await axios.get(`http://localhost:8000/api/status/${id}`);
+      const response = await axios.get(`http://localhost:8000/api/status/batch/${id}`);
       const task = response.data;
-      uploadStatus.value = `任务状态: ${task.status}`;
-      if (task.status === 'completed') {
+      uploadStatus.value = `批处理状态: ${task.status}`;
+      batchProgress.value = `${task.completed_files} / ${task.total_files} 文件已完成 (失败: ${task.failed_files})`;
+      
+      if (task.status === 'completed' || task.status === 'failed') {
         clearInterval(pollingInterval.value);
-        uploadStatus.value = '任务完成！';
-        await fetchResults(id);
-      } else if (task.status === 'failed') {
-        clearInterval(pollingInterval.value);
-        uploadStatus.value = '任务失败。';
-        errorDetails.value = task.error || '未知错误';
+        uploadStatus.value = '批处理完成！';
+        if (task.completed_files > 0) {
+            await fetchResults(id);
+        }
       }
     } catch (error) {
       clearInterval(pollingInterval.value);
@@ -111,28 +122,31 @@ const pollStatus = (id) => {
 };
 
 const handleUpload = async () => {
-  if (!selectedFile.value) {
+  if (selectedFiles.value.length === 0) {
     return;
   }
 
   isUploading.value = true;
   uploadStatus.value = '正在上传文件...';
-  taskId.value = null;
+  batchId.value = null;
+  batchProgress.value = '';
   results.value = null;
   errorDetails.value = '';
 
   const formData = new FormData();
-  formData.append('file', selectedFile.value);
+  selectedFiles.value.forEach(file => {
+    formData.append('files', file);
+  });
 
   try {
-    const response = await axios.post('http://localhost:8000/api/upload/', formData, {
+    const response = await axios.post('http://localhost:8000/api/upload/batch/', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
     });
-    taskId.value = response.data.task_id;
+    batchId.value = response.data.batch_id;
     uploadStatus.value = '文件上传成功！正在处理...';
-    pollStatus(response.data.task_id);
+    pollStatus(response.data.batch_id);
   } catch (error) {
     console.error('上传出错:', error);
     if (error.response) {
@@ -154,7 +168,7 @@ onUnmounted(() => {
 
 <style scoped>
 .upload-container {
-  max-width: 500px;
+  max-width: 600px;
   margin: 2rem auto;
   padding: 2rem;
   border: 1px solid #ccc;
@@ -179,6 +193,20 @@ onUnmounted(() => {
 .upload-box p {
   margin: 0;
   color: #666;
+}
+
+.upload-box ul {
+  list-style-type: none;
+  padding: 0;
+  margin-top: 0.5rem;
+  max-height: 150px;
+  overflow-y: auto;
+  font-size: 0.9em;
+}
+
+.small-text {
+    font-size: 0.8rem;
+    color: #999;
 }
 
 .upload-button {
