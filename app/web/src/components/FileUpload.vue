@@ -90,7 +90,7 @@ const handleFile = (files) => {
 
 const fetchResults = async (id) => {
   try {
-    const response = await axios.get(`http://localhost:8000/api/results/batch/${id}`);
+    const response = await axios.get(`/api/results/batch/${id}`);
     results.value = response.data;
   } catch (error) {
     console.error('获取结果出错:', error);
@@ -101,7 +101,7 @@ const fetchResults = async (id) => {
 const pollStatus = (id) => {
   pollingInterval.value = setInterval(async () => {
     try {
-      const response = await axios.get(`http://localhost:8000/api/status/batch/${id}`);
+      const response = await axios.get(`/api/status/batch/${id}`);
       const task = response.data;
       uploadStatus.value = `批处理状态: ${task.status}`;
       batchProgress.value = `${task.completed_files} / ${task.total_files} 文件已完成 (失败: ${task.failed_files})`;
@@ -134,26 +134,38 @@ const handleUpload = async () => {
   errorDetails.value = '';
 
   const formData = new FormData();
-  selectedFiles.value.forEach(file => {
+  selectedFiles.value.forEach((file, index) => {
+    console.log(`添加文件 ${index}:`, file.name, file.type, file.size);
     formData.append('files', file);
   });
 
+  // 调试：打印 FormData 内容
+  console.log('FormData 内容:');
+  for (let [key, value] of formData.entries()) {
+    console.log(key, value);
+  }
+
   try {
-    const response = await axios.post('http://localhost:8000/api/upload/batch/', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
+    // 使用 fetch API 替代 axios 来避免 Content-Type 设置问题
+    // 使用代理路径而不是直接的 localhost:8000
+    const response = await fetch('/api/upload/batch/', {
+      method: 'POST',
+      body: formData,
+      // 不设置 Content-Type，让浏览器自动处理，包括 boundary
     });
-    batchId.value = response.data.batch_id;
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ detail: `HTTP ${response.status}: ${response.statusText}` }));
+      throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const responseData = await response.json();
+    batchId.value = responseData.batch_id;
     uploadStatus.value = '文件上传成功！正在处理...';
-    pollStatus(response.data.batch_id);
+    pollStatus(responseData.batch_id);
   } catch (error) {
     console.error('上传出错:', error);
-    if (error.response) {
-      uploadStatus.value = `上传失败: ${error.response.data.detail || error.response.statusText}`;
-    } else {
-      uploadStatus.value = `上传失败: ${error.message}`;
-    }
+    uploadStatus.value = `上传失败: ${error.message}`;
   } finally {
     isUploading.value = false;
   }

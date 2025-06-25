@@ -6,7 +6,12 @@ OpenChemIE 化学信息提取工具 v2.0
 """
 
 import torch
-from openchemie import OpenChemIE
+from pdf2image import convert_from_path
+from PyPDF2 import PdfReader
+from tqdm import tqdm
+
+from .interface import OpenChemIE
+from .utils import *
 import os
 import json
 import argparse

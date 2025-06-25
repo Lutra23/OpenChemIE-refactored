@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.api
+    container_name: openchemie_api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../:/app
+    environment:
+      - PYTHONPATH=/app
+      - DATABASE_URL=postgresql://user:password@db:5432/openchemie_db
+    depends_on:
+      - db
+    # The command is defined in the Dockerfile, but can be overridden here for development
+    # command: uvicorn app.api.main:app --host 0.0.0.0 --port 8000 --reload
+
+  web:
+    image: node:18-slim
+    container_name: openchemie_web
+    working_dir: /usr/src/app
+    volumes:
+      - ../app/web:/usr/src/app
+    ports:
+      - "5173:5173"
+    command: >
+      sh -c "npm install && npm run dev -- --host"
+
+  db:
+    image: postgres:13
+    container_name: openchemie_db
+    restart: always
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=openchemie_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+volumes:
+  postgres_data: 

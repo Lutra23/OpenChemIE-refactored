@@ -1,0 +1,30 @@
+{
+  "name": "OpenChemIE Dev Container",
+  "dockerComposeFile": [
+    "../infra/docker-compose.yml"
+  ],
+  "service": "api",
+  "workspaceFolder": "/app",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "python.pythonPath": "/usr/local/bin/python",
+        "python.testing.pytestArgs": [
+          "tests"
+        ],
+        "python.testing.unittestEnabled": false,
+        "python.testing.pytestEnabled": true
+      },
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "charliermarsh.ruff",
+        "njpwerner.autodocstring",
+        "donjayamanne.githistory",
+        "eamodio.gitlens"
+      ]
+    }
+  },
+  "postCreateCommand": "pip install -r requirements-lock.txt && pre-commit install",
+  "remoteUser": "root"
+} 

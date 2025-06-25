@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenChemIE - 智能化学信息提取工具</title>
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/main.css') }}" rel="stylesheet">
+    <style>
+        .drop-zone {
+            border: 2px dashed #dee2e6;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #f8f9fa;
+        }
+        .drop-zone:hover, .drop-zone.dragover {
+            border-color: #0d6efd;
+            background: #e7f3ff;
+        }
+        .progress-container {
+            display: none;
+            margin-top: 20px;
+        }
+        .results-container {
+            display: none;
+            margin-top: 20px;
+        }
+        .system-status {
+            font-size: 0.9em;
+            color: #6c757d;
+        }
+        .status-badge {
+            font-size: 0.8em;
+        }
+        .performance-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <!-- 导航栏 -->
+        <nav class="navbar navbar-expand-lg">
+            <div class="container-fluid">
+                <a class="navbar-brand" href="/">
+                    <i class="bi bi-flask me-2"></i>OpenChemIE v2.0
+                </a>
+                <div class="navbar-nav ms-auto">
+                    <a class="nav-link active" href="/">
+                        <i class="bi bi-house"></i> 首页
+                    </a>
+                    <a class="nav-link" href="/history">
+                        <i class="bi bi-clock-history"></i> 历史记录
+                    </a>
+                </div>
+            </div>
+        </nav>
+
+        <!-- 主标题区域 -->
+        <div class="container mt-4">
+            <div class="row mb-4">
+                <div class="col-12 text-center">
+                    <div class="fade-in">
+                        <h1 class="display-4 fw-bold mb-3">
+                            <i class="bi bi-flask text-primary me-3"></i>
+                            OpenChemIE v2.0
+                        </h1>
+                        <p class="lead text-muted">
+                            🧪 智能化学信息提取工具 | 🤖 AI驱动的文献分析 | ⚡ 性能优化版
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 系统状态卡片 -->
+            <div class="row mb-4">
+                <div class="col-md-4">
+                    <div class="card performance-card h-100">
+                        <div class="card-body text-center">
+                            <div class="status-icon bg-white bg-opacity-25 mx-auto mb-3">
+                                <i class="bi bi-cpu text-white"></i>
+                            </div>
+                            <h6 class="card-title">系统状态</h6>
+                            <div id="systemStatus" class="system-status">
+                                <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                                检测中...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card glass-effect h-100">
+                        <div class="card-body text-center">
+                            <div class="status-icon bg-success mx-auto mb-3">
+                                <i class="bi bi-speedometer2 text-white"></i>
+                            </div>
+                            <h6 class="card-title">性能监控</h6>
+                            <button class="btn btn-sm btn-outline-primary" onclick="showSystemMonitor()">
+                                <i class="bi bi-graph-up"></i> 查看详情
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card glass-effect h-100">
+                        <div class="card-body text-center">
+                            <div class="status-icon bg-info mx-auto mb-3">
+                                <i class="bi bi-robot text-white"></i>
+                            </div>
+                            <h6 class="card-title">AI 功能</h6>
+                            <span id="aiStatus" class="badge status-success">已启用</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 主功能区域 -->
+            <div id="uploadTab">
+                <div class="row">
+                    <div class="col-lg-8">
+                        <div class="card fade-in">
+                            <div class="card-header">
+                                <h5 class="mb-0">
+                                    <i class="bi bi-cloud-upload"></i> 文档上传与分析
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <form id="uploadForm" enctype="multipart/form-data">
+                                    <div class="drop-zone" id="dropZone">
+                                        <div class="mb-3">
+                                            <i class="bi bi-cloud-upload display-4"></i>
+                                        </div>
+                                        <h5 class="mb-2">拖拽PDF文件到此处或点击选择</h5>
+                                        <p class="text-muted mb-3">支持最大50MB的PDF文件</p>
+                                        <div class="d-flex justify-content-center gap-2">
+                                            <span class="badge bg-primary">支持PDF</span>
+                                            <span class="badge bg-success">AI分析</span>
+                                            <span class="badge bg-info">结构提取</span>
+                                        </div>
+                                        <input type="file" id="fileInput" name="file" accept=".pdf" style="display: none;">
+                                    </div>
+                                </form>
+
+                                <!-- 文件信息显示 -->
+                                <div id="fileInfo" class="mt-3" style="display: none;">
+                                    <div class="alert alert-info">
+                                        <div class="d-flex align-items-center">
+                                            <i class="bi bi-file-earmark-pdf me-2"></i>
+                                            <div>
+                                                <strong id="fileName"></strong>
+                                                <div class="small text-muted" id="fileSize"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-4">
+                        <div class="card fade-in">
+                            <div class="card-header">
+                                <h6><i class="bi bi-gear"></i> 提取选项</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label for="device" class="form-label">计算设备</label>
+                                    <select class="form-select" id="device" name="device">
+                                        <option value="auto">🤖 自动选择</option>
+                                        <option value="cuda">🚀 GPU (CUDA)</option>
+                                        <option value="cpu">💻 CPU</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="config-section">
+                                    <h6 class="fw-bold mb-3">提取功能</h6>
+                                    
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="output_bbox" name="output_bbox" checked>
+                                        <label class="form-check-label" for="output_bbox">
+                                            <i class="bi bi-bounding-box me-1"></i>
+                                            输出边界框信息
+                                        </label>
+                                    </div>
+                                    
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="output_images" name="output_images">
+                                        <label class="form-check-label" for="output_images">
+                                            <i class="bi bi-image me-1"></i>
+                                            保存提取图片 <small class="text-muted">(耗内存)</small>
+                                        </label>
+                                    </div>
+                                    
+                                    <div class="form-check mb-3">
+                                        <input class="form-check-input" type="checkbox" id="extract_corefs" name="extract_corefs">
+                                        <label class="form-check-label" for="extract_corefs">
+                                            <i class="bi bi-diagram-3 me-1"></i>
+                                            提取分子共指关系 <small class="text-muted">(慢)</small>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="d-grid">
+                                    <button type="button" class="btn btn-primary btn-lg glow-effect" id="uploadBtn" disabled>
+                                        <i class="bi bi-rocket-takeoff me-2"></i>
+                                        开始智能提取
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 队列状态 -->
+                        <div class="card mt-3" id="queueStatus" style="display: none;">
+                            <div class="card-header">
+                                <h6 class="mb-0">
+                                    <i class="bi bi-list-ol"></i> 队列状态
+                                </h6>
+                            </div>
+                            <div class="card-body" id="queueInfo">
+                                <!-- 队列信息将通过JavaScript填充 -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 进度显示区域 -->
+            <div class="progress-container" id="progressContainer">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="bi bi-hourglass-split me-2"></i>
+                            <span id="progressTitle">处理中...</span>
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="progress mb-3">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                 id="progressBar" role="progressbar" style="width: 0%"></div>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span id="progressMessage">准备开始...</span>
+                            <span id="progressPercent">0%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 结果显示区域 -->
+            <div class="results-container" id="resultsContainer">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">
+                            <i class="bi bi-check-circle-fill text-success me-2"></i>
+                            提取完成
+                        </h6>
+                        <div>
+                            <button class="btn btn-sm btn-outline-primary" id="viewResultsBtn">
+                                <i class="bi bi-eye"></i> 查看详情
+                            </button>
+                            <button class="btn btn-sm btn-success" id="downloadBtn">
+                                <i class="bi bi-download"></i> 下载结果
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body" id="resultsPreview">
+                        <!-- 结果预览将通过JavaScript填充 -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- 性能监控面板 -->
+            <div id="monitorTab" style="display: none;">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-graph-up"></i> 系统性能监控
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="card glass-effect">
+                                    <div class="card-header">
+                                        <h6><i class="bi bi-cpu"></i> 系统资源</h6>
+                                    </div>
+                                    <div class="card-body" id="systemResources">
+                                        <div class="text-center">
+                                            <div class="spinner-border" role="status"></div>
+                                            <p class="mt-2">加载中...</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card glass-effect">
+                                    <div class="card-header">
+                                        <h6><i class="bi bi-list-task"></i> 任务统计</h6>
+                                    </div>
+                                    <div class="card-body" id="taskStats">
+                                        <div class="text-center">
+                                            <div class="spinner-border" role="status"></div>
+                                            <p class="mt-2">加载中...</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row mt-3">
+                            <div class="col-12">
+                                <div class="card glass-effect">
+                                    <div class="card-header d-flex justify-content-between">
+                                        <h6><i class="bi bi-arrow-repeat"></i> 任务队列</h6>
+                                        <button class="btn btn-sm btn-outline-danger" onclick="clearCache()">
+                                            <i class="bi bi-trash"></i> 清理缓存
+                                        </button>
+                                    </div>
+                                    <div class="card-body" id="queueDetails">
+                                        <div class="text-center">
+                                            <div class="spinner-border" role="status"></div>
+                                            <p class="mt-2">加载中...</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="text-center mt-3">
+                            <button class="btn btn-outline-primary" onclick="showUploadTab()">
+                                <i class="bi bi-arrow-left"></i> 返回上传页面
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html> 

@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>提取结果 - OpenChemIE</title>
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/themes/prism.min.css" rel="stylesheet">
+    <style>
+        .molecule-card {
+            transition: transform 0.2s ease;
+        }
+        .molecule-card:hover {
+            transform: translateY(-2px);
+        }
+        .smiles-text {
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            background-color: #f8f9fa;
+            padding: 0.5em;
+            border-radius: 4px;
+            word-break: break-all;
+        }
+        .confidence-bar {
+            height: 6px;
+            border-radius: 3px;
+        }
+        .json-viewer {
+            max-height: 400px;
+            overflow-y: auto;
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+        }
+        .section-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background: white;
+            border: none;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-flask me-2"></i>
+                OpenChemIE 提取工具
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/">
+                    <i class="fas fa-home me-1"></i>返回首页
+                </a>
+                <a class="nav-link" href="/history">
+                    <i class="fas fa-history me-1"></i>历史记录
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <!-- 页面标题 -->
+        <div class="section-header text-center">
+            <h2>
+                <i class="fas fa-chart-line me-2"></i>
+                提取结果分析
+            </h2>
+            <p class="mb-0">任务ID: {{ task_id }}</p>
+        </div>
+
+        <!-- 加载提示 -->
+        <div id="loadingSpinner" class="text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">加载中...</span>
+            </div>
+            <p class="mt-2">正在加载结果数据...</p>
+        </div>
+
+        <!-- 统计概览 -->
+        <div id="statsOverview" style="display: none;">
+            <div class="row mb-4">
+                <div class="col-md-3 mb-3">
+                    <div class="card stat-card">
+                        <div class="card-body text-center">
+                            <i class="fas fa-molecular-structure fa-2x text-primary mb-2"></i>
+                            <h4 id="totalMolecules" class="mb-1">0</h4>
+                            <p class="text-muted mb-0">分子数量</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <div class="card stat-card">
+                        <div class="card-body text-center">
+                            <i class="fas fa-exchange-alt fa-2x text-success mb-2"></i>
+                            <h4 id="totalReactions" class="mb-1">0</h4>
+                            <p class="text-muted mb-0">反应数量</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <div class="card stat-card">
+                        <div class="card-body text-center">
+                            <i class="fas fa-image fa-2x text-warning mb-2"></i>
+                            <h4 id="totalFigures" class="mb-1">0</h4>
+                            <p class="text-muted mb-0">图片数量</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <div class="card stat-card">
+                        <div class="card-body text-center">
+                            <i class="fas fa-table fa-2x text-info mb-2"></i>
+                            <h4 id="totalTables" class="mb-1">0</h4>
+                            <p class="text-muted mb-0">表格数量</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 选项卡导航 -->
+        <ul class="nav nav-tabs" id="resultTabs" role="tablist" style="display: none;">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="molecules-tab" data-bs-toggle="tab" data-bs-target="#molecules" type="button" role="tab">
+                    <i class="fas fa-molecular-structure me-2"></i>分子信息
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="reactions-tab" data-bs-toggle="tab" data-bs-target="#reactions" type="button" role="tab">
+                    <i class="fas fa-exchange-alt me-2"></i>反应信息
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="tables-tab" data-bs-toggle="tab" data-bs-target="#tables" type="button" role="tab">
+                    <i class="fas fa-table me-2"></i>表格数据
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="metadata-tab" data-bs-toggle="tab" data-bs-target="#metadata" type="button" role="tab">
+                    <i class="fas fa-info-circle me-2"></i>元数据
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="json-tab" data-bs-toggle="tab" data-bs-target="#json" type="button" role="tab">
+                    <i class="fas fa-code me-2"></i>原始JSON
+                </button>
+            </li>
+        </ul>
+
+        <!-- 选项卡内容 -->
+        <div class="tab-content mt-4" id="resultTabsContent" style="display: none;">
+            <!-- 分子信息标签页 -->
+            <div class="tab-pane fade show active" id="molecules" role="tabpanel">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-molecular-structure me-2"></i>
+                            检测到的分子
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="moleculesContent">
+                            <div class="text-center text-muted py-4">
+                                <i class="fas fa-search fa-3x mb-3"></i>
+                                <p>未发现分子信息</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 反应信息标签页 -->
+            <div class="tab-pane fade" id="reactions" role="tabpanel">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-exchange-alt me-2"></i>
+                            检测到的反应
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="reactionsContent">
+                            <div class="text-center text-muted py-4">
+                                <i class="fas fa-search fa-3x mb-3"></i>
+                                <p>未发现反应信息</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 表格数据标签页 -->
+            <div class="tab-pane fade" id="tables" role="tabpanel">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-table me-2"></i>
+                            表格数据
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="tablesContent">
+                            <div class="text-center text-muted py-4">
+                                <i class="fas fa-search fa-3x mb-3"></i>
+                                <p>未发现表格数据</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 元数据标签页 -->
+            <div class="tab-pane fade" id="metadata" role="tabpanel">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-info-circle me-2"></i>
+                            处理信息
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="metadataContent"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 原始JSON标签页 -->
+            <div class="tab-pane fade" id="json" role="tabpanel">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-code me-2"></i>
+                            原始JSON数据
+                        </h5>
+                        <button class="btn btn-sm btn-outline-primary" onclick="copyJsonToClipboard()">
+                            <i class="fas fa-copy me-1"></i>复制
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="json-viewer">
+                            <pre id="jsonContent"><code class="language-json"></code></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 操作按钮 -->
+        <div class="text-center mt-4 mb-5" id="actionButtons" style="display: none;">
+            <a href="/download/{{ task_id }}" class="btn btn-primary btn-lg me-3">
+                <i class="fas fa-download me-2"></i>
+                下载完整结果
+            </a>
+            <a href="/" class="btn btn-outline-primary btn-lg">
+                <i class="fas fa-plus me-2"></i>
+                提取新文件
+            </a>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/components/prism-core.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/plugins/autoloader/prism-autoloader.min.js"></script>
+    
+    <script>
+        const taskId = '{{ task_id }}';
+        let resultsData = null;
+
+        // 页面加载时获取结果数据
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const response = await fetch(`/api/results/${taskId}`);
+                if (response.ok) {
+                    resultsData = await response.json();
+                    displayResults(resultsData);
+                } else {
+                    showError('加载结果失败');
+                }
+            } catch (error) {
+                showError('网络错误，无法加载结果');
+            }
+        });
+
+        function displayResults(data) {
+            // 隐藏加载提示
+            document.getElementById('loadingSpinner').style.display = 'none';
+            
+            // 显示统计概览
+            updateStatsOverview(data);
+            
+            // 显示分子信息
+            displayMolecules(data.chemical_entities?.molecules);
+            
+            // 显示反应信息
+            displayReactions(data.chemical_entities?.reactions);
+            
+            // 显示表格数据
+            displayTables(data.document_content?.tables);
+            
+            // 显示元数据
+            displayMetadata(data.metadata);
+            
+            // 显示JSON数据
+            displayJsonData(data);
+            
+            // 显示所有UI元素
+            ['statsOverview', 'resultTabs', 'resultTabsContent', 'actionButtons'].forEach(id => {
+                document.getElementById(id).style.display = 'block';
+            });
+        }
+
+        function updateStatsOverview(data) {
+            const stats = data.statistics?.document_overview || {};
+            document.getElementById('totalMolecules').textContent = stats.unique_molecules || 0;
+            document.getElementById('totalReactions').textContent = stats.total_reactions || 0;
+            document.getElementById('totalFigures').textContent = stats.total_figures || 0;
+            document.getElementById('totalTables').textContent = stats.total_tables || 0;
+        }
+
+        function displayMolecules(moleculesData) {
+            const container = document.getElementById('moleculesContent');
+            
+            if (!moleculesData || !moleculesData.by_source) {
+                return;
+            }
+
+            let html = '';
+            
+            // 显示来自图片的分子
+            if (moleculesData.by_source.figures?.length > 0) {
+                html += '<h6 class="text-primary mb-3"><i class="fas fa-image me-2"></i>来自图片的分子</h6>';
+                moleculesData.by_source.figures.forEach((figure, figIndex) => {
+                    if (figure.molecules?.length > 0) {
+                        html += `<div class="mb-4">
+                            <h6 class="text-muted">图片 ${figIndex + 1}</h6>
+                            <div class="row">`;
+                        
+                        figure.molecules.forEach((mol, molIndex) => {
+                            const smiles = mol.chemical_data?.smiles || '未知';
+                            const confidence = (mol.location?.confidence || 0) * 100;
+                            
+                            html += `
+                                <div class="col-md-6 mb-3">
+                                    <div class="card molecule-card h-100">
+                                        <div class="card-body">
+                                            <h6 class="card-title">${mol.molecule_id || `分子 ${molIndex + 1}`}</h6>
+                                            <div class="smiles-text mb-2">${smiles}</div>
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <small class="text-muted">置信度: ${confidence.toFixed(1)}%</small>
+                                                <div class="confidence-bar bg-light" style="width: 60px;">
+                                                    <div class="bg-primary h-100" style="width: ${confidence}%;"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                        
+                        html += '</div></div>';
+                    }
+                });
+            }
+
+            if (html) {
+                container.innerHTML = html;
+            }
+        }
+
+        function displayReactions(reactionsData) {
+            const container = document.getElementById('reactionsContent');
+            
+            if (!reactionsData || !reactionsData.reaction_list?.length) {
+                return;
+            }
+
+            let html = '';
+            reactionsData.reaction_list.forEach((reaction, index) => {
+                html += `
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h6 class="mb-0">反应 ${index + 1} - ${reaction.reaction_id}</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <h6 class="text-success">反应物</h6>
+                                    <ul class="list-unstyled">
+                                        ${(reaction.reaction_data?.reactants || []).map(r => 
+                                            `<li class="small">${r.smiles || r.name || '未知'}</li>`
+                                        ).join('')}
+                                    </ul>
+                                </div>
+                                <div class="col-md-4">
+                                    <h6 class="text-warning">条件</h6>
+                                    <ul class="list-unstyled">
+                                        ${(reaction.reaction_data?.conditions || []).map(c => 
+                                            `<li class="small">${c.text || c.name || '未知'}</li>`
+                                        ).join('')}
+                                    </ul>
+                                </div>
+                                <div class="col-md-4">
+                                    <h6 class="text-primary">产物</h6>
+                                    <ul class="list-unstyled">
+                                        ${(reaction.reaction_data?.products || []).map(p => 
+                                            `<li class="small">${p.smiles || p.name || '未知'}</li>`
+                                        ).join('')}
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        function displayTables(tablesData) {
+            const container = document.getElementById('tablesContent');
+            
+            if (!tablesData || !tablesData.table_list?.length) {
+                return;
+            }
+
+            let html = '';
+            tablesData.table_list.forEach((table, index) => {
+                html += `
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h6 class="mb-0">表格 ${index + 1} - ${table.table_info?.title || '未命名表格'}</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                ${renderTable(table)}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        function renderTable(tableData) {
+            const structure = tableData.structure;
+            const data = tableData.data;
+            
+            if (!structure || !data) {
+                return '<p class="text-muted">表格数据不完整</p>';
+            }
+
+            let html = '<table class="table table-sm table-striped">';
+            
+            // 表头
+            if (structure.column_headers?.length > 0) {
+                html += '<thead class="table-light"><tr>';
+                structure.column_headers.forEach(header => {
+                    html += `<th>${header.text || '未知列'}</th>`;
+                });
+                html += '</tr></thead>';
+            }
+            
+            // 表体
+            html += '<tbody>';
+            if (data.rows?.length > 0) {
+                data.rows.forEach(row => {
+                    html += '<tr>';
+                    if (row.cells?.length > 0) {
+                        row.cells.forEach(cell => {
+                            html += `<td>${cell.content?.text || ''}</td>`;
+                        });
+                    }
+                    html += '</tr>';
+                });
+            }
+            html += '</tbody></table>';
+            
+            return html;
+        }
+
+        function displayMetadata(metadata) {
+            const container = document.getElementById('metadataContent');
+            
+            const extractionInfo = metadata?.extraction_info || {};
+            const documentInfo = metadata?.document_info || {};
+            
+            const html = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>提取信息</h6>
+                        <table class="table table-sm">
+                            <tr><td>处理时间</td><td>${extractionInfo.timestamp || '未知'}</td></tr>
+                            <tr><td>版本</td><td>${extractionInfo.extractor_version || '未知'}</td></tr>
+                            <tr><td>设备</td><td>${extractionInfo.device_used || '未知'}</td></tr>
+                            <tr><td>耗时</td><td>${extractionInfo.processing_time_seconds || 0}秒</td></tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>文档信息</h6>
+                        <table class="table table-sm">
+                            <tr><td>文件名</td><td>${documentInfo.file_name || '未知'}</td></tr>
+                            <tr><td>文件大小</td><td>${documentInfo.file_size_mb || 0} MB</td></tr>
+                            <tr><td>页面数</td><td>${documentInfo.total_pages || 0}</td></tr>
+                            <tr><td>语言</td><td>${documentInfo.language || '未知'}</td></tr>
+                        </table>
+                    </div>
+                </div>
+            `;
+            
+            container.innerHTML = html;
+        }
+
+        function displayJsonData(data) {
+            const codeElement = document.querySelector('#jsonContent code');
+            codeElement.textContent = JSON.stringify(data, null, 2);
+            Prism.highlightElement(codeElement);
+        }
+
+        function copyJsonToClipboard() {
+            const jsonText = document.querySelector('#jsonContent code').textContent;
+            navigator.clipboard.writeText(jsonText).then(() => {
+                // 显示复制成功提示
+                const btn = event.target.closest('button');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-check me-1"></i>已复制';
+                btn.classList.remove('btn-outline-primary');
+                btn.classList.add('btn-success');
+                
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                    btn.classList.remove('btn-success');
+                    btn.classList.add('btn-outline-primary');
+                }, 2000);
+            });
+        }
+
+        function showError(message) {
+            document.getElementById('loadingSpinner').innerHTML = `
+                <div class="text-center text-danger">
+                    <i class="fas fa-exclamation-triangle fa-3x mb-3"></i>
+                    <h5>加载失败</h5>
+                    <p>${message}</p>
+                    <a href="/" class="btn btn-primary">返回首页</a>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html> 

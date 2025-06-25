@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import FileResponse, JSONResponse
 from typing import List
 import json
+from fastapi_cache.decorator import cache
 
 from ..deps import get_settings, task_status
 from ..models import TaskStatusResponse, HistoryItem, BatchStatusResponse
@@ -15,6 +16,7 @@ from ..models import TaskStatusResponse, HistoryItem, BatchStatusResponse
 router = APIRouter()
 
 @router.get("/status/batch/{batch_id}", response_model=BatchStatusResponse)
+@cache(expire=2)
 async def get_batch_status(batch_id: str):
     """
     获取批处理任务的状态
@@ -25,6 +27,7 @@ async def get_batch_status(batch_id: str):
     return BatchStatusResponse(**task_status[batch_id])
 
 @router.get("/status/{task_id}", response_model=TaskStatusResponse)
+@cache(expire=2)
 async def get_task_status(task_id: str):
     """
     获取任务状态
@@ -38,6 +41,7 @@ async def get_task_status(task_id: str):
     return TaskStatusResponse(**task_data)
 
 @router.get("/results/batch/{batch_id}")
+@cache(expire=3600)
 async def get_batch_results(batch_id: str, settings = Depends(get_settings)):
     """
     获取批处理任务的所有结果
@@ -65,6 +69,7 @@ async def get_batch_results(batch_id: str, settings = Depends(get_settings)):
     return JSONResponse(content=aggregated_results)
 
 @router.get("/results/{task_id}")
+@cache(expire=3600)
 async def get_results(task_id: str, settings = Depends(get_settings)):
     """
     获取任务结果 (JSON 格式)
@@ -113,6 +118,7 @@ async def download_results(task_id: str, settings = Depends(get_settings)):
     )
 
 @router.get("/history", response_model=List[HistoryItem])
+@cache(expire=60)
 async def get_history():
     """
     获取任务历史记录
@@ -141,6 +147,7 @@ async def get_history():
     return history_data
 
 @router.get("/api/results/{task_id}")
+@cache(expire=3600)
 async def get_results_api(task_id: str, settings = Depends(get_settings)):
     """
     API 格式获取任务结果（兼容旧接口）

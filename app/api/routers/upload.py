@@ -61,6 +61,17 @@ async def upload_batch_files(
             # 简单跳过无效文件，或者可以引发异常
             continue
         
+        # 检查文件大小
+        file.file.seek(0, 2)  # 移动到文件末尾
+        file_size = file.file.tell()
+        file.file.seek(0)  # 重置到开头
+        
+        if file_size > settings.max_content_length:
+            raise HTTPException(
+                status_code=413, 
+                detail=f"文件 '{file.filename}' 的大小 ({file_size // 1024 // 1024}MB) 超过了允许的最大值。"
+            )
+        
         # 可以在这里添加文件大小检查
         
         task_id = submit_task(
